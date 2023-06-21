@@ -25,7 +25,7 @@ private:
   void poseCallback(const turtlesim::msg::Pose::SharedPtr msg);
   void controlCallback();
   double calculateError();
-  std::pair<double, double> calculateCommand(double error);
+  std::pair<double, double> calculateCommand(double error, double dt);
   void publishCommand(const std::pair<double, double>& command);
 
   rclcpp_action::GoalResponse handleGoal(
@@ -52,6 +52,11 @@ private:
   double ki_;
   double kd_;
   double goal_reach_tol_;
+  double max_linear_velocity_;
+  double max_angular_velocity_;
+  double max_linear_acceleration_;
+  double max_linear_deceleration_;
+
   double error_integral_;
   double last_error_;
 };

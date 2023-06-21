@@ -10,7 +10,7 @@ def generate_launch_description():
         executable='pid_pose_controller',
         output='screen',
         parameters=[os.path.join(get_package_share_directory("turtle_control"), "config", 'params.yaml')],
-        prefix=['xterm -e gdb -ex run --args'],
+        # prefix=['xterm -e gdb -ex run --args'],
     )
 
     turtlesim_node = Node(

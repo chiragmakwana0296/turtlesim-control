@@ -19,11 +19,19 @@ PIDController::PIDController() : Node("pid_controller")
   this->declare_parameter<double>("ki", 0.0);
   this->declare_parameter<double>("kd", 0.1);
   this->declare_parameter<double>("goal_reach_tol", 0.01);
+  this->declare_parameter<double>("max_linear_velocity", 1.0);
+  this->declare_parameter<double>("max_angular_velocity", 2.0);
+  this->declare_parameter<double>("max_linear_acceleration", 0.1);
+  this->declare_parameter<double>("max_linear_deceleration", 0.1);
 
   this->get_parameter("kp", kp_);
   this->get_parameter("ki", ki_);
   this->get_parameter("kd", kd_);
   this->get_parameter("goal_reach_tol", goal_reach_tol_);
+  this->get_parameter("max_linear_velocity", max_linear_velocity_);
+  this->get_parameter("max_angular_velocity", max_angular_velocity_);
+  this->get_parameter("max_linear_acceleration", max_linear_acceleration_);
+    this->get_parameter("max_linear_deceleration", max_linear_deceleration_);
 
   error_integral_ = 0.0;
   last_error_ = 0.0;
@@ -66,7 +74,7 @@ void PIDController::handle_accepted(const std::shared_ptr<GoalHandleGoToPose> go
 
 void PIDController::execute(const std::shared_ptr<GoalHandleGoToPose> goal_handle)
 {
-  rclcpp::Rate loop_rate(10);
+  rclcpp::Rate loop_rate(50);
   const auto goal = goal_handle->get_goal();
   RCLCPP_INFO(this->get_logger(), "Executing goal request: x: %f, y: %f ", goal->x, goal->y);
 
@@ -75,14 +83,24 @@ void PIDController::execute(const std::shared_ptr<GoalHandleGoToPose> goal_handl
   target_pose->x = goal->x;
   target_pose->y = goal->y;
   setTargetPose(target_pose);
+  
+  rclcpp::Time last_time = this->now();
 
   while (rclcpp::ok())
   {
     if (target_pose_ != nullptr && current_pose_ != nullptr)
     {
       double error = calculateError();
-      auto command = calculateCommand(error);
+
+      rclcpp::Time current_time = this->now();  // Get the current time
+      double dt = (current_time - last_time).seconds();  // Calculate the time difference
+      RCLCPP_INFO(this->get_logger(), "dt: %f", dt);
+      auto command = calculateCommand(error, dt);
+
       publishCommand(command);
+
+      last_time = current_time;  // Update the last time
+
     }
     if (goal_handle->is_canceling())
     {
@@ -117,9 +135,10 @@ void PIDController::controlCallback()
 {
   if (target_pose_ != nullptr && current_pose_ != nullptr)
   {
-    double error = calculateError();
-    auto command = calculateCommand(error);
-    publishCommand(command);
+    ;
+    // double error = calculateError();
+    // auto command = calculateCommand(error);
+    // publishCommand(command);
   }
 }
 
@@ -136,16 +155,12 @@ double PIDController::calculateError()
   return distance_error;
 }
 
-std::pair<double, double> PIDController::calculateCommand(double error)
+std::pair<double, double> PIDController::calculateCommand(double error, double dt)
 {
   error_integral_ += error;
   double error_derivative = error - last_error_;
   last_error_ = error;
 
-  double linear_velocity = kp_ * error + ki_ * error_integral_ + kd_ * error_derivative;
-
-  double max_linear_velocity = 0.5;
-  linear_velocity = std::max(std::min(linear_velocity, max_linear_velocity), -max_linear_velocity);
 
   double target_x = target_pose_->x;
   double target_y = target_pose_->y;
@@ -153,10 +168,28 @@ std::pair<double, double> PIDController::calculateCommand(double error)
   double current_y = current_pose_->y;
   double angle_to_goal = std::atan2(target_y - current_y, target_x - current_x);
 
-  double angular_velocity = kp_ * (angle_to_goal - current_pose_->theta);
+  // Acc Decc Profile
+  double desired_linear_velocity = kp_ * error + ki_ * error_integral_ + kd_ * error_derivative;
+  double current_linear_velocity = current_pose_->linear_velocity; // std::sqrt(std::pow(current_pose_->linear_velocity, 2) + std::pow(current_pose_->angular_velocity, 2));
+  double linear_acceleration = (desired_linear_velocity - current_linear_velocity)/dt;
 
-  double max_angular_velocity = 1.0;
-  angular_velocity = std::max(std::min(angular_velocity, max_angular_velocity), -max_angular_velocity);
+  if (linear_acceleration > max_linear_acceleration_)
+  {
+    linear_acceleration = max_linear_acceleration_;
+  }
+  else if (linear_acceleration < -max_linear_deceleration_)
+  {
+    linear_acceleration = -max_linear_deceleration_;
+  }
+
+  double linear_velocity = current_linear_velocity + linear_acceleration * dt;
+
+  // RCLCPP_INFO(this->get_logger(), "linear_velocity: %f", linear_velocity);
+  // linear_velocity = kp_ * error + ki_ * error_integral_ + kd_ * error_derivative;
+  linear_velocity = std::min(linear_velocity, max_linear_velocity_);
+
+  double angular_velocity = (angle_to_goal - current_pose_->theta);
+  angular_velocity = std::max(std::min(angular_velocity, max_angular_velocity_), -max_angular_velocity_);
 
   return std::make_pair(linear_velocity, angular_velocity);
 }
