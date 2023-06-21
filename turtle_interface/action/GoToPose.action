@@ -1,0 +1,9 @@
+float64 x
+float64 y
+---
+bool reached
+float64 time_taken
+---
+float64 current_x
+float64 current_y
+float64 current_velocity
