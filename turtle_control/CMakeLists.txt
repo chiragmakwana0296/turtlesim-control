@@ -11,9 +11,11 @@ find_package(ament_cmake REQUIRED)
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rclcpp_action REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(turtlesim REQUIRED)
+find_package(turtle_interface REQUIRED)
 
 
 include_directories(
@@ -23,9 +25,11 @@ include_directories(
 add_executable(pid_pose_controller src/pid_pose_controller.cpp)
 ament_target_dependencies(pid_pose_controller
   rclcpp
+  rclcpp_action
   geometry_msgs
   nav_msgs
   turtlesim
+  turtle_interface
 )
 set_target_properties(pid_pose_controller PROPERTIES
   CXX_STANDARD 14

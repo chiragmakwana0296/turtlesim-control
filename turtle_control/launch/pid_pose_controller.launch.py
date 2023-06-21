@@ -6,11 +6,11 @@ import os
 
 def generate_launch_description():
     pid_pose_controller_node = Node(
-        package='turtlesim',
-        executable='turtlesim_node',
+        package='turtle_control',
+        executable='pid_pose_controller',
         output='screen',
         parameters=[os.path.join(get_package_share_directory("turtle_control"), "config", 'params.yaml')],
-        # prefix=['xterm -e gdb -ex run --args'],
+        prefix=['xterm -e gdb -ex run --args'],
     )
 
     turtlesim_node = Node(

@@ -11,23 +11,97 @@ PIDController::PIDController() : Node("pid_controller")
   cmd_pub_ = this->create_publisher<geometry_msgs::msg::Twist>("/turtle1/cmd_vel", 10);
   pose_sub_ = this->create_subscription<turtlesim::msg::Pose>(
       "/turtle1/pose", 10, std::bind(&PIDController::poseCallback, this, std::placeholders::_1));
-  
 
-  timer_ = this->create_wall_timer(100ms, std::bind(&PIDController::controlCallback, this));
+  // timer_ = this->create_wall_timer(100ms, std::bind(&PIDController::controlCallback, this));
 
   // PID parameters
   this->declare_parameter<double>("kp", 0.5);
   this->declare_parameter<double>("ki", 0.0);
   this->declare_parameter<double>("kd", 0.1);
+  this->declare_parameter<double>("goal_reach_tol", 0.01);
 
   this->get_parameter("kp", kp_);
   this->get_parameter("ki", ki_);
   this->get_parameter("kd", kd_);
+  this->get_parameter("goal_reach_tol", goal_reach_tol_);
 
   error_integral_ = 0.0;
   last_error_ = 0.0;
 
+  action_server_ = rclcpp_action::create_server<GoToPose>(
+      this,
+      "set_target_pose",
+      std::bind(&PIDController::handleGoal, this, std::placeholders::_1, std::placeholders::_2),
+      std::bind(&PIDController::handleCancel, this, std::placeholders::_1),
+      std::bind(&PIDController::handle_accepted, this, std::placeholders::_1));
+
+  RCLCPP_INFO(this->get_logger(), "PID Controller initialized.");
+
 }
+
+rclcpp_action::GoalResponse PIDController::handleGoal(
+    const rclcpp_action::GoalUUID& uuid,
+    std::shared_ptr<const GoToPose::Goal> goal)
+{
+  RCLCPP_INFO(this->get_logger(), "Received goal request");
+  (void)uuid;
+
+  return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
+}
+
+rclcpp_action::CancelResponse PIDController::handleCancel(
+    const std::shared_ptr<GoalHandleGoToPose> goal_handle)
+{
+  RCLCPP_INFO(this->get_logger(), "Received goal cancel request");
+  (void)goal_handle;
+
+  return rclcpp_action::CancelResponse::ACCEPT;
+}
+
+void PIDController::handle_accepted(const std::shared_ptr<GoalHandleGoToPose> goal_handle)
+{
+  using namespace std::placeholders;
+  std::thread{std::bind(&PIDController::execute, this, _1), goal_handle}.detach();
+}
+
+void PIDController::execute(const std::shared_ptr<GoalHandleGoToPose> goal_handle)
+{
+  rclcpp::Rate loop_rate(10);
+  const auto goal = goal_handle->get_goal();
+  RCLCPP_INFO(this->get_logger(), "Executing goal request: x: %f, y: %f ", goal->x, goal->y);
+
+  // Set the target pose based on the goal request
+  auto target_pose = std::make_shared<turtlesim::msg::Pose>();
+  target_pose->x = goal->x;
+  target_pose->y = goal->y;
+  setTargetPose(target_pose);
+
+  while (rclcpp::ok())
+  {
+    if (target_pose_ != nullptr && current_pose_ != nullptr)
+    {
+      double error = calculateError();
+      auto command = calculateCommand(error);
+      publishCommand(command);
+    }
+    if (goal_handle->is_canceling())
+    {
+      RCLCPP_INFO(this->get_logger(), "Goal canceled");
+      goal_handle->canceled(std::make_shared<GoToPose::Result>());
+      return;
+    }
+
+    if (calculateError() < goal_reach_tol_)  
+    {
+      RCLCPP_INFO(this->get_logger(), "Goal achieved");
+      goal_handle->succeed(std::make_shared<GoToPose::Result>());
+      return;
+    }
+
+    loop_rate.sleep();
+  }
+}
+
 
 void PIDController::setTargetPose(const turtlesim::msg::Pose::SharedPtr target_pose)
 {
@@ -100,11 +174,6 @@ int main(int argc, char** argv)
 {
   rclcpp::init(argc, argv);
   auto pid_controller = std::make_shared<PIDController>();
-
-  auto target_pose = std::make_shared<turtlesim::msg::Pose>();
-  target_pose->x = 2.0;
-  target_pose->y = 3.0;
-  pid_controller->setTargetPose(target_pose);
 
   rclcpp::spin(pid_controller);
   rclcpp::shutdown();
