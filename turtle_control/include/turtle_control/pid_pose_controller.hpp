@@ -29,7 +29,8 @@ private:
   void controlCallback();
   double calculatePosError();
   double calculateVelError();
-  std::pair<double, double> calculateCommand(double error, double dt);
+  std::pair<double, double> controlPose(double error, double dt);
+  std::pair<double, double> calculateCommand(double target_linear_vel, double target_angular_vel, double dt);
   void publishCommand(const std::pair<double, double>& command);
 
   rclcpp_action::GoalResponse handleGoal(
@@ -72,7 +73,8 @@ private:
   double error_integral_;
   double last_error_;
 
-  bool init_service_req_{false};
+  bool got_command_vel_{false};
+  bool init_controller_{false};
   bool enable_rotate_circle_{false};
   rclcpp::Time last_time;
 };
