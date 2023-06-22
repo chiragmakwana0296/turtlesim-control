@@ -9,6 +9,7 @@
 #include "nav_msgs/msg/odometry.hpp"
 #include "turtlesim/msg/pose.hpp"
 #include "turtle_interface/action/go_to_pose.hpp"
+#include "turtle_interface/srv/rotate_circle.hpp"
 #include <cmath>
 
 class PIDController : public rclcpp::Node
@@ -20,11 +21,14 @@ public:
   PIDController();
 
   void setTargetPose(const turtlesim::msg::Pose::SharedPtr target_pose);
+  void setTargetVelocity(const geometry_msgs::msg::Twist::SharedPtr target_pose);
 
 private:
   void poseCallback(const turtlesim::msg::Pose::SharedPtr msg);
+  void velocityCallback(const geometry_msgs::msg::Twist::SharedPtr msg);
   void controlCallback();
-  double calculateError();
+  double calculatePosError();
+  double calculateVelError();
   std::pair<double, double> calculateCommand(double error, double dt);
   void publishCommand(const std::pair<double, double>& command);
 
@@ -43,10 +47,18 @@ private:
 
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_pub_;
   rclcpp::Subscription<turtlesim::msg::Pose>::SharedPtr pose_sub_;
+  rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr target_vel_sub_;
   rclcpp::TimerBase::SharedPtr timer_;
 
   turtlesim::msg::Pose::SharedPtr target_pose_;
   turtlesim::msg::Pose::SharedPtr current_pose_;
+  geometry_msgs::msg::Twist::SharedPtr target_velocity_;
+
+  void handleService(
+    const std::shared_ptr<turtle_interface::srv::RotateCircle::Request> request,
+    std::shared_ptr<turtle_interface::srv::RotateCircle::Response> response);
+
+  rclcpp::Service<turtle_interface::srv::RotateCircle>::SharedPtr service_;
 
   double kp_;
   double ki_;
@@ -59,6 +71,10 @@ private:
 
   double error_integral_;
   double last_error_;
+
+  bool init_service_req_{false};
+  bool enable_rotate_circle_{false};
+  rclcpp::Time last_time;
 };
 
 #endif 

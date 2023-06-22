@@ -9,6 +9,9 @@ PIDController::PIDController() : Node("pid_controller")
   current_pose_ = nullptr;
 
   cmd_pub_ = this->create_publisher<geometry_msgs::msg::Twist>("/turtle1/cmd_vel", 10);
+  target_vel_sub_ = this->create_subscription<geometry_msgs::msg::Twist>(
+      "/turtle1/cmd_vel/desired", 10, std::bind(&PIDController::velocityCallback, this, std::placeholders::_1));
+
   pose_sub_ = this->create_subscription<turtlesim::msg::Pose>(
       "/turtle1/pose", 10, std::bind(&PIDController::poseCallback, this, std::placeholders::_1));
 
@@ -43,9 +46,15 @@ PIDController::PIDController() : Node("pid_controller")
       std::bind(&PIDController::handleCancel, this, std::placeholders::_1),
       std::bind(&PIDController::handle_accepted, this, std::placeholders::_1));
 
+  service_ = create_service<turtle_interface::srv::RotateCircle>(
+    "rotate_circle",
+    std::bind(&PIDController::handleService, this, std::placeholders::_1, std::placeholders::_2)
+  );
   RCLCPP_INFO(this->get_logger(), "PID Controller initialized.");
 
 }
+
+
 
 rclcpp_action::GoalResponse PIDController::handleGoal(
     const rclcpp_action::GoalUUID& uuid,
@@ -74,6 +83,9 @@ void PIDController::handle_accepted(const std::shared_ptr<GoalHandleGoToPose> go
 
 void PIDController::execute(const std::shared_ptr<GoalHandleGoToPose> goal_handle)
 {
+  auto result = std::make_shared<GoToPose::Result>();
+  auto feedback = std::make_shared<GoToPose::Feedback>();
+  double time_taken = 0.0;
   rclcpp::Rate loop_rate(50);
   const auto goal = goal_handle->get_goal();
   RCLCPP_INFO(this->get_logger(), "Executing goal request: x: %f, y: %f ", goal->x, goal->y);
@@ -84,42 +96,57 @@ void PIDController::execute(const std::shared_ptr<GoalHandleGoToPose> goal_handl
   target_pose->y = goal->y;
   setTargetPose(target_pose);
   
-  rclcpp::Time last_time = this->now();
-
+  last_time = this->now();
   while (rclcpp::ok())
   {
+    rclcpp::Time current_time = this->now();  // Get the current time
+    double dt = (current_time - last_time).seconds();  // Calculate the time difference
+    
     if (target_pose_ != nullptr && current_pose_ != nullptr)
     {
-      double error = calculateError();
-
-      rclcpp::Time current_time = this->now();  // Get the current time
-      double dt = (current_time - last_time).seconds();  // Calculate the time difference
+      double error = calculatePosError();
       RCLCPP_INFO(this->get_logger(), "dt: %f", dt);
       auto command = calculateCommand(error, dt);
 
       publishCommand(command);
-
-      last_time = current_time;  // Update the last time
+      feedback->current_x = current_pose_->x;
+      feedback->current_y = current_pose_->y;
+      feedback->current_velocity = current_pose_->linear_velocity;
+      goal_handle->publish_feedback(feedback);
 
     }
     if (goal_handle->is_canceling())
     {
       RCLCPP_INFO(this->get_logger(), "Goal canceled");
-      goal_handle->canceled(std::make_shared<GoToPose::Result>());
+      result->reached = false;
+      goal_handle->canceled(result);
       return;
     }
 
-    if (calculateError() < goal_reach_tol_)  
-    {
-      RCLCPP_INFO(this->get_logger(), "Goal achieved");
-      goal_handle->succeed(std::make_shared<GoToPose::Result>());
+    time_taken += dt;
+    if (calculatePosError() < goal_reach_tol_)  
+    {      
+      result->reached = true;
+      result->time_taken = time_taken;
+      RCLCPP_INFO(this->get_logger(), "Goal achieved - time_taken: %f", result->time_taken);
+      goal_handle->succeed(result);
       return;
     }
 
     loop_rate.sleep();
+    last_time = current_time;  // Update the last time
   }
 }
 
+void PIDController::setTargetVelocity(const geometry_msgs::msg::Twist::SharedPtr target_velocity)
+{
+  target_velocity_ = target_velocity;
+}
+
+void PIDController::velocityCallback(const geometry_msgs::msg::Twist::SharedPtr msg)
+{
+  setTargetVelocity(msg);
+}
 
 void PIDController::setTargetPose(const turtlesim::msg::Pose::SharedPtr target_pose)
 {
@@ -131,18 +158,47 @@ void PIDController::poseCallback(const turtlesim::msg::Pose::SharedPtr msg)
   current_pose_ = msg;
 }
 
+
+void PIDController::handleService(
+  const std::shared_ptr<turtle_interface::srv::RotateCircle::Request> request,
+  std::shared_ptr<turtle_interface::srv::RotateCircle::Response> response)
+{
+  // Retrieve the center coordinates from the request
+  init_service_req_ = true;
+  auto target_pose = std::make_shared<turtlesim::msg::Pose>();
+  target_pose->x = request->center_x;
+  target_pose->y = request->center_y;
+  enable_rotate_circle_ = request->enable;
+  setTargetPose(target_pose);
+
+  response->success = true;
+}
+
+
 void PIDController::controlCallback()
 {
-  if (target_pose_ != nullptr && current_pose_ != nullptr)
-  {
-    ;
-    // double error = calculateError();
-    // auto command = calculateCommand(error);
-    // publishCommand(command);
+  if(enable_rotate_circle_){
+    if(init_service_req_){
+      last_time = this->now();
+      init_service_req_ = false;
+    }
+    
+    rclcpp::Time current_time = this->now();  // Get the current time
+    double dt = (current_time - last_time).seconds();  // Calculate the time difference
+      
+    if (target_pose_ != nullptr && current_pose_ != nullptr)
+    {
+      double error = calculatePosError();
+      RCLCPP_INFO(this->get_logger(), "dt: %f", dt);
+      auto command = calculateCommand(error, dt);
+      publishCommand(command);
+    }
+
+    last_time = current_time;  // Update the last time
   }
 }
 
-double PIDController::calculateError()
+double PIDController::calculatePosError()
 {
   double target_x = target_pose_->x;
   double target_y = target_pose_->y;
@@ -154,6 +210,15 @@ double PIDController::calculateError()
 
   return distance_error;
 }
+
+double PIDController::calculateVelError()
+{
+  double velocity_error = target_velocity_->linear.x + current_pose_->linear_velocity;
+
+  return velocity_error;
+}
+
+
 
 std::pair<double, double> PIDController::calculateCommand(double error, double dt)
 {

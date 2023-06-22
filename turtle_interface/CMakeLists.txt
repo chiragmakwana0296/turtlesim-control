@@ -15,8 +15,9 @@ find_package(action_msgs REQUIRED)
 find_package(builtin_interfaces REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "action/GoToPose.action"
-  DEPENDENCIES builtin_interfaces action_msgs
+"action/GoToPose.action"
+"srv/RotateCircle.srv"
+DEPENDENCIES builtin_interfaces action_msgs
 )
 
 if(BUILD_TESTING)
