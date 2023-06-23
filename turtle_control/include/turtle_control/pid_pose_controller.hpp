@@ -76,6 +76,8 @@ private:
   bool got_command_vel_{false};
   bool init_controller_{false};
   bool enable_rotate_circle_{false};
+  bool add_acce_deccl_limits_{false};
+  double desired_linear_velocity;
   rclcpp::Time last_time;
 };
 

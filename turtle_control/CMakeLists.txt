@@ -36,8 +36,23 @@ set_target_properties(pid_pose_controller PROPERTIES
   CXX_STANDARD_REQUIRED ON
 )
 
+add_executable(rotate_circle src/rotate_circle.cpp)
+ament_target_dependencies(rotate_circle
+  rclcpp
+  rclcpp_action
+  geometry_msgs
+  nav_msgs
+  turtlesim
+  turtle_interface
+)
+set_target_properties(rotate_circle PROPERTIES
+  CXX_STANDARD 14
+  CXX_STANDARD_REQUIRED ON
+)
+
+
 # Install executable
-install(TARGETS pid_pose_controller
+install(TARGETS pid_pose_controller rotate_circle
   DESTINATION lib/${PROJECT_NAME}
 )
 

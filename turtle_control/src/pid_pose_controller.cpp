@@ -221,8 +221,8 @@ double PIDController::calculateVelError()
 
 std::pair<double, double> PIDController::controlPose(double error, double dt)
 {
-  error_integral_ += error;
-  double error_derivative = error - last_error_;
+  error_integral_ += error*dt;
+  double error_derivative = (error - last_error_)/dt;
   last_error_ = error;
 
   double target_x = target_pose_->x;
@@ -253,26 +253,33 @@ std::pair<double, double> PIDController::calculateCommand(double target_linear_v
   this->get_parameter("max_linear_acceleration", max_linear_acceleration_);
   this->get_parameter("max_linear_deceleration", max_linear_deceleration_);
 
-
-  double error = target_linear_vel - current_pose_->linear_velocity;
+  double linear_velocity{0.0};
+  double error = std::abs(target_linear_vel) - current_pose_->linear_velocity;
   error_integral_ += error*dt;
-  double error_derivative = (error - last_error_)*dt;
+  double error_derivative = (error - last_error_)/dt;
   last_error_ = error;
 
   // Acc Decc Profile
-  double desired_linear_velocity = kp_ * error*dt + ki_ * error_integral_ + kd_ * error_derivative;
-  double current_linear_velocity = std::sqrt(std::pow(current_pose_->linear_velocity, 2) + std::pow(current_pose_->angular_velocity, 2));
-  double linear_acceleration = (desired_linear_velocity - current_linear_velocity)/dt;
 
-  if (linear_acceleration > max_linear_acceleration_)
-  {
-    linear_acceleration = max_linear_acceleration_;
+  if(add_acce_deccl_limits_){
+      desired_linear_velocity += (kp_ * error + ki_ * error_integral_ + kd_ * error_derivative);
+      double current_linear_velocity = current_pose_->linear_velocity; //std::sqrt(std::pow(current_pose_->linear_velocity, 2) + std::pow(current_pose_->angular_velocity, 2));
+      double linear_acceleration = (desired_linear_velocity - current_linear_velocity)/dt;
+
+      if (linear_acceleration > max_linear_acceleration_)
+      {
+        linear_acceleration = max_linear_acceleration_;
+      }
+      else if (linear_acceleration < -max_linear_deceleration_)
+      {
+        linear_acceleration = -max_linear_deceleration_;
+      }
+      linear_velocity = current_linear_velocity + (linear_acceleration * dt);
+
+  } else{
+      desired_linear_velocity = (kp_ * error + ki_ * error_integral_ + kd_ * error_derivative);
+      linear_velocity = desired_linear_velocity;
   }
-  else if (linear_acceleration < -max_linear_deceleration_)
-  {
-    linear_acceleration = -max_linear_deceleration_;
-  }
-  double linear_velocity = current_linear_velocity + (linear_acceleration * dt);
   // RCLCPP_INFO(this->get_logger(), "linear_velocity: %f", linear_velocity);
   linear_velocity = std::min(linear_velocity, max_linear_velocity_);
 
