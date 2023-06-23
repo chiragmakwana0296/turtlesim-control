@@ -8,19 +8,19 @@ PIDController::PIDController() : Node("pid_controller")
   target_pose_ = nullptr;
   current_pose_ = nullptr;
 
-  cmd_pub_ = this->create_publisher<geometry_msgs::msg::Twist>("/turtle1/cmd_vel", 10);
+  cmd_pub_ = this->create_publisher<geometry_msgs::msg::Twist>("cmd_vel", 10);
   target_vel_sub_ = this->create_subscription<geometry_msgs::msg::Twist>(
-      "/turtle1/cmd_vel/desired", 10, std::bind(&PIDController::velocityCallback, this, std::placeholders::_1));
+      "cmd_vel/desired", 10, std::bind(&PIDController::velocityCallback, this, std::placeholders::_1));
 
   pose_sub_ = this->create_subscription<turtlesim::msg::Pose>(
-      "/turtle1/pose", 10, std::bind(&PIDController::poseCallback, this, std::placeholders::_1));
+      "pose", 10, std::bind(&PIDController::poseCallback, this, std::placeholders::_1));
 
   timer_ = this->create_wall_timer(50ms, std::bind(&PIDController::controlCallback, this));
 
   // PID parameters
   this->declare_parameter<double>("kp", 0.5);
   this->declare_parameter<double>("ki", 0.0);
-  this->declare_parameter<double>("kd", 0.1);
+  this->declare_parameter<double>("kd", 0.0);
   this->declare_parameter<double>("goal_reach_tol", 0.01);
   this->declare_parameter<double>("max_linear_velocity", 1.0);
   this->declare_parameter<double>("max_angular_velocity", 2.0);
@@ -53,7 +53,6 @@ PIDController::PIDController() : Node("pid_controller")
   RCLCPP_INFO(this->get_logger(), "PID Controller initialized.");
 
 }
-
 
 
 rclcpp_action::GoalResponse PIDController::handleGoal(
@@ -105,10 +104,9 @@ void PIDController::execute(const std::shared_ptr<GoalHandleGoToPose> goal_handl
     if (target_pose_ != nullptr && current_pose_ != nullptr)
     {
       double error_pose = calculatePosError();
-      RCLCPP_INFO(this->get_logger(), "dt: %f", dt);
       auto command_target = controlPose(error_pose, dt);
-      auto command = calculateCommand(command_target.first, command_target.second, dt);
-      publishCommand(command);
+      // auto command = calculateCommand(command_target.first, command_target.second, dt);
+      publishCommand(command_target);
       feedback->current_x = current_pose_->x;
       feedback->current_y = current_pose_->y;
       feedback->current_velocity = current_pose_->linear_velocity;
@@ -189,7 +187,6 @@ void PIDController::controlCallback()
     
     if (target_velocity_ != nullptr)
     {
-      RCLCPP_INFO(this->get_logger(), "dt: %f", dt);
       auto command = calculateCommand(target_velocity_->linear.x, target_velocity_->angular.z, dt);
       publishCommand(command);
     }
@@ -221,6 +218,15 @@ double PIDController::calculateVelError()
 
 std::pair<double, double> PIDController::controlPose(double error, double dt)
 {
+  this->get_parameter("kp", kp_);
+  this->get_parameter("ki", ki_);
+  this->get_parameter("kd", kd_);
+  this->get_parameter("goal_reach_tol", goal_reach_tol_);
+  this->get_parameter("max_linear_velocity", max_linear_velocity_);
+  this->get_parameter("max_angular_velocity", max_angular_velocity_);
+  this->get_parameter("max_linear_acceleration", max_linear_acceleration_);
+  this->get_parameter("max_linear_deceleration", max_linear_deceleration_);
+
   error_integral_ += error*dt;
   double error_derivative = (error - last_error_)/dt;
   last_error_ = error;
@@ -231,11 +237,26 @@ std::pair<double, double> PIDController::controlPose(double error, double dt)
   double current_y = current_pose_->y;
   double angle_to_goal = std::atan2(target_y - current_y, target_x - current_x);
 
+  desired_linear_velocity += (kp_ * error + ki_ * error_integral_ + kd_ * error_derivative);
+  
+  double current_linear_velocity = current_pose_->linear_velocity; //std::sqrt(std::pow(current_pose_->linear_velocity, 2) + std::pow(current_pose_->angular_velocity, 2));
+  double linear_acceleration = (desired_linear_velocity - current_linear_velocity)/dt;
+
+  if (linear_acceleration > max_linear_acceleration_)
+  {
+    linear_acceleration = max_linear_acceleration_;
+  }
+  else if (linear_acceleration < -max_linear_deceleration_)
+  {
+    linear_acceleration = -max_linear_deceleration_;
+  }
+  double linear_velocity = current_linear_velocity + (linear_acceleration * dt);
+
+
   // RCLCPP_INFO(this->get_logger(), "linear_velocity: %f", linear_velocity);
-  double linear_velocity = kp_ * error + ki_ * error_integral_ + kd_ * error_derivative;
   linear_velocity = std::min(linear_velocity, max_linear_velocity_);
 
-  double angular_velocity = (angle_to_goal - current_pose_->theta);
+  double angular_velocity = (angle_to_goal - current_pose_->theta)/dt;
   angular_velocity = std::max(std::min(angular_velocity, max_angular_velocity_), -max_angular_velocity_);
 
   return std::make_pair(linear_velocity, angular_velocity);
@@ -302,7 +323,6 @@ int main(int argc, char** argv)
 {
   rclcpp::init(argc, argv);
   auto pid_controller = std::make_shared<PIDController>();
-
   rclcpp::spin(pid_controller);
   rclcpp::shutdown();
   return 0;
