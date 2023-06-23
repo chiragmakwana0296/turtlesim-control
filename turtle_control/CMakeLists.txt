@@ -50,9 +50,22 @@ set_target_properties(rotate_circle PROPERTIES
   CXX_STANDARD_REQUIRED ON
 )
 
+add_executable(chase_turtle src/chase_turtle.cpp)
+ament_target_dependencies(chase_turtle
+  rclcpp
+  rclcpp_action
+  geometry_msgs
+  nav_msgs
+  turtlesim
+  turtle_interface
+)
+set_target_properties(chase_turtle PROPERTIES
+  CXX_STANDARD 14
+  CXX_STANDARD_REQUIRED ON
+)
 
 # Install executable
-install(TARGETS pid_pose_controller rotate_circle
+install(TARGETS pid_pose_controller rotate_circle chase_turtle
   DESTINATION lib/${PROJECT_NAME}
 )
 
