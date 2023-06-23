@@ -4,12 +4,12 @@
 RotateTurtleNode::RotateTurtleNode()
   : Node("rotate_turtle")
 {
-    cmd_pub_ = create_publisher<geometry_msgs::msg::Twist>("/turtle1/cmd_vel", 10);
+    cmd_pub_ = create_publisher<geometry_msgs::msg::Twist>("cmd_vel", 10);
     rt_real_pose_pub_ = create_publisher<turtlesim::msg::Pose>("rt_real_pose", 10);
     rt_noisy_pose_pub_ = create_publisher<turtlesim::msg::Pose>("rt_noisy_pose", 10);
     
     pose_sub_ = this->create_subscription<turtlesim::msg::Pose>(
-        "/turtle1/pose", 10, std::bind(&RotateTurtleNode::poseCallback, this, std::placeholders::_1));
+        "pose", 10, std::bind(&RotateTurtleNode::poseCallback, this, std::placeholders::_1));
 
     pose_pub_timer_ = create_wall_timer(std::chrono::milliseconds(5000), std::bind(&RotateTurtleNode::posePubTimerCallback, this));
     cmd_timer_ = create_wall_timer(std::chrono::milliseconds(50), std::bind(&RotateTurtleNode::commandPubTimerCallback, this));
@@ -38,7 +38,7 @@ void RotateTurtleNode::poseCallback(const turtlesim::msg::Pose::SharedPtr msg)
 void RotateTurtleNode::teleportTurtle()
 {
 
-  auto teleport_service = create_client<turtlesim::srv::TeleportAbsolute>("/turtle1/teleport_absolute");
+  auto teleport_service = create_client<turtlesim::srv::TeleportAbsolute>("teleport_absolute");
   while (!teleport_service->wait_for_service(std::chrono::seconds(1))) {
     if (!rclcpp::ok()) {
       RCLCPP_ERROR(this->get_logger(), "Interrupted while waiting for the teleport service. Exiting.");
