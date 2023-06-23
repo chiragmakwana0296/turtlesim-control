@@ -2,7 +2,9 @@
 #define PID_POSE_CONTROLLER_HPP
 #include <functional>
 #include <memory>
+#include <atomic>
 #include <thread>
+#include <mutex>
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
 #include "geometry_msgs/msg/twist.hpp"
@@ -79,6 +81,10 @@ private:
   bool add_acce_deccl_limits_{false};
   double desired_linear_velocity;
   rclcpp::Time last_time;
+
+  std::atomic_bool is_running_; // Atomic flag to control the thread
+  std::mutex thread_mutex_; // Mutex to protect access to the thread
+
 };
 
 #endif 
