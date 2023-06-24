@@ -60,9 +60,10 @@ def generate_launch_description():
     )
 
     delay_timer = TimerAction(
-        period=0.10,  # Delay of 5 seconds
+        period=10.0,  # Delay of 5 seconds
         actions=[ExecuteProcess(cmd=['ros2', 'service', 'call', '/spawn', 'turtlesim/srv/Spawn', "{ x: 2.0, y: 2.0, theta: 0.0, name: 'turtle2'}"]),
-                 ],
+                         pid_pose_controller_two_node,
+        chaser_node],
     )
 
 
@@ -71,8 +72,7 @@ def generate_launch_description():
         turtlesim_node,
         rotate_turtle_node,
         delay_timer,
-        pid_pose_controller_two_node,
-        chaser_node
+
         
     ])
 
