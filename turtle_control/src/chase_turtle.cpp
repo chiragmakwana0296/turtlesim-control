@@ -6,10 +6,15 @@ TurtleChaserNode::TurtleChaserNode()
   pose_sub_ = create_subscription<turtlesim::msg::Pose>(
       "rt_real_pose", 10, std::bind(&TurtleChaserNode::poseCallback, this, std::placeholders::_1));
 
-  action_client_ = rclcpp_action::create_client<turtle_interface::action::GoToPose>(this, "set_target_pose");
+  action_client_ = rclcpp_action::create_client<turtle_interface::action::GoToPose>(
+      this->get_node_base_interface(),
+      this->get_node_graph_interface(),
+      this->get_node_logging_interface(),
+      this->get_node_waitables_interface(),
+      "set_target_pose");
   timer_ = create_wall_timer(std::chrono::milliseconds(100), std::bind(&TurtleChaserNode::timerCallback, this));
 
-  while (!action_client_->wait_for_action_server(std::chrono::seconds(1))) {
+  while (!this->action_client_->wait_for_action_server(std::chrono::seconds(1))) {
     if (!rclcpp::ok()) {
       RCLCPP_ERROR(this->get_logger(), "Interrupted while waiting for the action server.");
       return;
@@ -27,26 +32,48 @@ void TurtleChaserNode::poseCallback(const turtlesim::msg::Pose::SharedPtr msg)
     
     RCLCPP_INFO(this->get_logger(), "goal x: %f, y: %f", goal.x, goal.y);
     auto send_goal_options = rclcpp_action::Client<turtle_interface::action::GoToPose>::SendGoalOptions();
+    // send_goal_options.goal_response_callback =
+    //   std::bind(&TurtleChaserNode::goalResponseCallback, this, std::placeholders::_1);
+
     send_goal_options.feedback_callback =
         std::bind(&TurtleChaserNode::feedbackCallback, this, std::placeholders::_1, std::placeholders::_2);
+    
+    send_goal_options.result_callback =
+        std::bind(&TurtleChaserNode::resultCallback, this, std::placeholders::_1);
 
-    auto goal_handle = action_client_->async_send_goal(goal, send_goal_options);
+    this->action_client_->async_send_goal(goal, send_goal_options);
 
   }
 }
 
+void TurtleChaserNode::goalResponseCallback(std::shared_future<rclcpp_action::ClientGoalHandle<turtle_interface::action::GoToPose>::SharedPtr> future){
+  auto goal_handle = future.get();
+    if (!goal_handle) {
+      RCLCPP_ERROR(this->get_logger(), "Goal was rejected by server");
+    } else {
+      RCLCPP_INFO(this->get_logger(), "Goal accepted by server, waiting for result");
+    }
+}
 
-void TurtleChaserNode::feedbackCallback(rclcpp_action::ClientGoalHandle<turtle_interface::action::GoToPose>::SharedPtr, const std::shared_ptr<const turtle_interface::action::GoToPose::Feedback> feedback)
-  {
-    current_x = feedback->current_x;
-    current_y = feedback->current_y;
-  }
 
+void TurtleChaserNode::feedbackCallback(
+    rclcpp_action::ClientGoalHandle<turtle_interface::action::GoToPose>::SharedPtr goal_handle, 
+    const std::shared_ptr<const turtle_interface::action::GoToPose::Feedback> feedback)
+{
+  current_x_ = feedback->current_x;
+  current_y_ = feedback->current_y;
+  RCLCPP_INFO(this->get_logger(), "Feedback current_x: %f, current_y: %f units", current_x_, current_y_);
+}
+
+void TurtleChaserNode::resultCallback(const rclcpp_action::ClientGoalHandle<turtle_interface::action::GoToPose>::WrappedResult & result)
+{
+
+}
 
 void TurtleChaserNode::timerCallback()
 {
-    double dist = getDistance(current_x, current_y, rt_real_pose_x , rt_real_pose_y);
-    RCLCPP_INFO(this->get_logger(), "Target is at distance of %f units", dist);
+    double dist = getDistance(current_x_, current_y_, rt_real_pose_x , rt_real_pose_y);
+    // RCLCPP_INFO(this->get_logger(), "Target is at distance of %f units", dist);
 
     if(dist < 3.0){
       RCLCPP_INFO(this->get_logger(), "Target Reached! .. at distance of %f units", dist);

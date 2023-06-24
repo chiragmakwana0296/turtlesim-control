@@ -19,11 +19,14 @@ public:
 private:
   void poseCallback(const turtlesim::msg::Pose::SharedPtr msg);
   void timerCallback();
-  void feedbackCallback(rclcpp_action::ClientGoalHandle<turtle_interface::action::GoToPose>::SharedPtr, const std::shared_ptr<const turtle_interface::action::GoToPose::Feedback> feedback);
+
+  void goalResponseCallback(std::shared_future<rclcpp_action::ClientGoalHandle<turtle_interface::action::GoToPose>::SharedPtr> future);
+  void feedbackCallback(rclcpp_action::ClientGoalHandle<turtle_interface::action::GoToPose>::SharedPtr goal_handle, const std::shared_ptr<const turtle_interface::action::GoToPose::Feedback> feedback);
+  void resultCallback(const rclcpp_action::ClientGoalHandle<turtle_interface::action::GoToPose>::WrappedResult & result);
   double getDistance(double x1, double y1, double x2, double y2);
 
-  double current_x{};
-  double current_y;
+  double current_x_;
+  double current_y_;
   double rt_real_pose_x{99.0};
   double rt_real_pose_y{99.0};
   bool target_reached{false};
