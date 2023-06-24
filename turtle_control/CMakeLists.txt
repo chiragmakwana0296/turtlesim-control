@@ -64,8 +64,22 @@ set_target_properties(chase_turtle PROPERTIES
   CXX_STANDARD_REQUIRED ON
 )
 
+add_executable(follow_grid src/follow_grid.cpp)
+ament_target_dependencies(follow_grid
+  rclcpp
+  rclcpp_action
+  geometry_msgs
+  nav_msgs
+  turtlesim
+  turtle_interface
+)
+set_target_properties(follow_grid PROPERTIES
+  CXX_STANDARD 14
+  CXX_STANDARD_REQUIRED ON
+)
+
 # Install executable
-install(TARGETS pid_pose_controller rotate_circle chase_turtle
+install(TARGETS pid_pose_controller rotate_circle chase_turtle follow_grid
   DESTINATION lib/${PROJECT_NAME}
 )
 
