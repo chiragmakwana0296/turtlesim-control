@@ -1,0 +1,55 @@
+/turtle1/pid_controller:
+  ros__parameters:
+    kd: 0.01
+    ki: 0.001
+    kp: 0.9
+    goal_reach_tol: 0.05
+    max_linear_velocity: 0.75
+    max_angular_velocity: 1.0
+    max_linear_acceleration: 1.0
+    max_linear_deceleration: 1.0
+    
+    qos_overrides:
+      /parameter_events:
+        publisher:
+          depth: 1000
+          durability: volatile
+          history: keep_last
+          reliability: reliable
+    use_sim_time: false
+
+/turtle1/rotate_turtle_goal_three:
+  ros__parameters:
+    qos_overrides:
+      /parameter_events:
+        publisher:
+          depth: 1000
+          durability: volatile
+          history: keep_last
+          reliability: reliable
+    radius: 3.0
+    speed: 0.5
+    use_sim_time: false
+
+
+############################################################################
+/turtle2/pid_controller:
+  ros__parameters:
+    kd: 0.01
+    ki: 0.001
+    kp: 0.9
+    goal_reach_tol: 0.05
+    max_linear_velocity: 0.25 # half of turtle1
+    max_angular_velocity: 0.5 # half of turtle1
+    max_linear_acceleration: 0.2
+    max_linear_deceleration: 0.2
+    
+    qos_overrides:
+      /parameter_events:
+        publisher:
+          depth: 1000
+          durability: volatile
+          history: keep_last
+          reliability: reliable
+    use_sim_time: false
+
