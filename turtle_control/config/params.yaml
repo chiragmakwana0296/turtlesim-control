@@ -2,12 +2,13 @@
   ros__parameters:
     kd: 0.01
     ki: 0.0001
-    kp: 0.5
+    kp: 0.7
     goal_reach_tol: 0.05
-    max_linear_velocity: 1.0
-    max_angular_velocity: 2.0
-    max_linear_acceleration: 0.3
-    max_linear_deceleration: 0.5
+    max_linear_velocity: 50.0
+    max_angular_velocity: 100.0
+    max_linear_acceleration: 0.2
+    max_linear_deceleration: 0.6
+    add_acce_deccl_limits: false
     
     qos_overrides:
       /parameter_events:
@@ -27,8 +28,8 @@
           durability: volatile
           history: keep_last
           reliability: reliable
-    radius: 3.0
-    speed: 0.5
+    radius: 4.50
+    speed: 1.5
     use_sim_time: false
 
 
