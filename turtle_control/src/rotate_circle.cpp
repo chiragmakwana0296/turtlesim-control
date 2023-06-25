@@ -10,7 +10,7 @@ RotateTurtleNode::RotateTurtleNode()
     
     pose_sub_ = this->create_subscription<turtlesim::msg::Pose>(
         "pose", 10, std::bind(&RotateTurtleNode::poseCallback, this, std::placeholders::_1));
-
+    
     pose_pub_timer_ = create_wall_timer(std::chrono::milliseconds(5000), std::bind(&RotateTurtleNode::posePubTimerCallback, this));
     cmd_timer_ = create_wall_timer(std::chrono::milliseconds(50), std::bind(&RotateTurtleNode::commandPubTimerCallback, this));
     std::random_device rd;
@@ -48,8 +48,9 @@ void RotateTurtleNode::teleportTurtle()
   }
 
   auto request = std::make_shared<turtlesim::srv::TeleportAbsolute::Request>();
+    this->get_parameter("radius", radius_);
   request->x = 5.54;  
-  request->y = 5.54;  
+  request->y = 5.54-radius_;  
   request->theta = 0; 
 
   auto future = teleport_service->async_send_request(request);
