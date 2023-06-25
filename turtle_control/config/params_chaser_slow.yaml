@@ -9,7 +9,7 @@
     max_linear_acceleration: 0.2
     max_linear_deceleration: 0.6
     add_acce_deccl_limits: false
-    
+
     qos_overrides:
       /parameter_events:
         publisher:
@@ -28,22 +28,23 @@
           durability: volatile
           history: keep_last
           reliability: reliable
-    radius: 4.50
-    speed: 1.5
+    radius: 4.0
+    speed: 1.0
     use_sim_time: false
 
 
 ############################################################################
 /turtle2/pid_controller:
   ros__parameters:
-    kd: 0.01
+    kd: 0.005
     ki: 0.001
     kp: 0.9
-    goal_reach_tol: 0.05
-    max_linear_velocity: 0.75
+    goal_reach_tol: 0.09
+    max_linear_velocity: 0.5
     max_angular_velocity: 1.0
-    max_linear_acceleration: 0.2
-    max_linear_deceleration: 0.2
+    max_linear_acceleration: 0.6
+    max_linear_deceleration: 0.6
+    add_acce_deccl_limits: true
     
     qos_overrides:
       /parameter_events:
@@ -53,3 +54,4 @@
           history: keep_last
           reliability: reliable
     use_sim_time: false
+

@@ -31,6 +31,7 @@ private:
   void controlCallback();
   double calculatePosError();
   double calculateVelError();
+  double mapAngles(double angle);
   std::pair<double, double> controlPose(double error, double dt);
   std::pair<double, double> calculateCommand(double target_linear_vel, double target_angular_vel, double dt);
   void publishCommand(const std::pair<double, double>& command);
@@ -74,6 +75,9 @@ private:
 
   double error_integral_;
   double last_error_;
+
+  double error_integral_theta_;
+  double last_error_theta_;
 
   bool got_command_vel_{false};
   bool init_controller_{false};

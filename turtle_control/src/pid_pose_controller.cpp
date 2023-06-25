@@ -26,6 +26,7 @@ PIDController::PIDController() : Node("pid_controller")
   this->declare_parameter<double>("max_angular_velocity", 2.0);
   this->declare_parameter<double>("max_linear_acceleration", 0.1);
   this->declare_parameter<double>("max_linear_deceleration", 0.1);
+  this->declare_parameter<bool>("add_acce_deccl_limits", true);
 
   this->get_parameter("kp", kp_);
   this->get_parameter("ki", ki_);
@@ -34,7 +35,8 @@ PIDController::PIDController() : Node("pid_controller")
   this->get_parameter("max_linear_velocity", max_linear_velocity_);
   this->get_parameter("max_angular_velocity", max_angular_velocity_);
   this->get_parameter("max_linear_acceleration", max_linear_acceleration_);
-    this->get_parameter("max_linear_deceleration", max_linear_deceleration_);
+  this->get_parameter("max_linear_deceleration", max_linear_deceleration_);
+  this->get_parameter("add_acce_deccl_limits", add_acce_deccl_limits_);
 
   error_integral_ = 0.0;
   last_error_ = 0.0;
@@ -105,7 +107,6 @@ void PIDController::execute(const std::shared_ptr<GoalHandleGoToPose> goal_handl
     {
       double error_pose = calculatePosError();
       auto command_target = controlPose(error_pose, dt);
-      // auto command = calculateCommand(command_target.first, command_target.second, dt);
       publishCommand(command_target);
       feedback->current_x = current_pose_->x;
       feedback->current_y = current_pose_->y;
@@ -215,6 +216,13 @@ double PIDController::calculateVelError()
 
   return velocity_error;
 }
+double PIDController::mapAngles(double angle) {
+  if (angle >= 0.0) {
+    return angle;
+  } else {
+    return (angle + 2.0 * M_PI);
+  }
+}
 
 std::pair<double, double> PIDController::controlPose(double error, double dt)
 {
@@ -226,39 +234,57 @@ std::pair<double, double> PIDController::controlPose(double error, double dt)
   this->get_parameter("max_angular_velocity", max_angular_velocity_);
   this->get_parameter("max_linear_acceleration", max_linear_acceleration_);
   this->get_parameter("max_linear_deceleration", max_linear_deceleration_);
+  this->get_parameter("add_acce_deccl_limits", add_acce_deccl_limits_);
 
-  error_integral_ += error*dt;
-  double error_derivative = (error - last_error_)/dt;
+  error_integral_ += error;
+  double error_derivative = (error - last_error_);
   last_error_ = error;
 
   double target_x = target_pose_->x;
   double target_y = target_pose_->y;
   double current_x = current_pose_->x;
   double current_y = current_pose_->y;
-  double angle_to_goal = std::atan2(target_y - current_y, target_x - current_x);
-
-  desired_linear_velocity += (kp_ * error + ki_ * error_integral_ + kd_ * error_derivative);
   
-  double current_linear_velocity = current_pose_->linear_velocity; //std::sqrt(std::pow(current_pose_->linear_velocity, 2) + std::pow(current_pose_->angular_velocity, 2));
-  double linear_acceleration = (desired_linear_velocity - current_linear_velocity)/dt;
+  double angle_to_goal = std::atan2(target_y - current_y, target_x - current_x);
+  
+  double linear_velocity{0.0};
+  if(add_acce_deccl_limits_){
 
-  if (linear_acceleration > max_linear_acceleration_)
-  {
-    linear_acceleration = max_linear_acceleration_;
+    desired_linear_velocity = (kp_ * error + ki_ * error_integral_ + kd_ * error_derivative);
+    
+    double current_linear_velocity = current_pose_->linear_velocity; //std::sqrt(std::pow(current_pose_->linear_velocity, 2) + std::pow(current_pose_->angular_velocity, 2));
+    double linear_acceleration = (desired_linear_velocity - current_linear_velocity)/dt;
+
+    if (linear_acceleration > max_linear_acceleration_)
+    {
+      linear_acceleration = max_linear_acceleration_;
+    }
+    else if (linear_acceleration < -max_linear_deceleration_)
+    {
+      linear_acceleration = -max_linear_deceleration_;
+    }
+    linear_velocity = current_linear_velocity + (linear_acceleration * dt);
+  }else{
+      linear_velocity = (kp_ * error + ki_ * error_integral_ + kd_ * error_derivative);
   }
-  else if (linear_acceleration < -max_linear_deceleration_)
-  {
-    linear_acceleration = -max_linear_deceleration_;
-  }
-  double linear_velocity = current_linear_velocity + (linear_acceleration * dt);
 
-
-  // RCLCPP_INFO(this->get_logger(), "linear_velocity: %f", linear_velocity);
   linear_velocity = std::min(linear_velocity, max_linear_velocity_);
 
-  double angular_velocity = (angle_to_goal - current_pose_->theta)/dt;
-  angular_velocity = std::max(std::min(angular_velocity, max_angular_velocity_), -max_angular_velocity_);
+  double  angular_velocity{0.0};
+  double error_theta = (angle_to_goal - current_pose_->theta);
+    while (error_theta > M_PI) {
+    error_theta -= 2 * M_PI;
+  }
+  while (error_theta < -M_PI) {
+    error_theta += 2 * M_PI;
+  }
+  double error_derivative_theta = (error_theta - last_error_theta_);
+  last_error_theta_ = error_theta;
+  error_integral_theta_ += error_theta;
 
+  angular_velocity = (6.0*kp_ * (error_theta) + ki_ * error_integral_theta_ + kd_ * error_derivative_theta);
+
+  angular_velocity = std::max(std::min(angular_velocity, max_angular_velocity_), -max_angular_velocity_);
   return std::make_pair(linear_velocity, angular_velocity);
 }
 
@@ -273,6 +299,7 @@ std::pair<double, double> PIDController::calculateCommand(double target_linear_v
   this->get_parameter("max_angular_velocity", max_angular_velocity_);
   this->get_parameter("max_linear_acceleration", max_linear_acceleration_);
   this->get_parameter("max_linear_deceleration", max_linear_deceleration_);
+  this->get_parameter("add_acce_deccl_limits", add_acce_deccl_limits_);
 
   double linear_velocity{0.0};
   double error = std::abs(target_linear_vel) - current_pose_->linear_velocity;
@@ -298,7 +325,7 @@ std::pair<double, double> PIDController::calculateCommand(double target_linear_v
       linear_velocity = current_linear_velocity + (linear_acceleration * dt);
 
   } else{
-      desired_linear_velocity = (kp_ * error + ki_ * error_integral_ + kd_ * error_derivative);
+      desired_linear_velocity += (kp_ * error + ki_ * error_integral_ + kd_ * error_derivative);
       linear_velocity = desired_linear_velocity;
   }
   // RCLCPP_INFO(this->get_logger(), "linear_velocity: %f", linear_velocity);
