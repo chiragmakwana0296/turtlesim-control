@@ -107,7 +107,7 @@ private:
   }
 
 
-std::vector<std::pair<double, double>> generate_waypoints(double spacing_x = 5.0, double spacing_y = 1.0, int num_rows = 5, int num_cols = 2) {
+std::vector<std::pair<double, double>> generate_waypoints(double spacing_x = 9.0, double spacing_y = 2.0, int num_rows = 5, int num_cols = 2) {
   std::vector<std::pair<double, double>> waypoints;
   
   int direction = 1; //-1;
