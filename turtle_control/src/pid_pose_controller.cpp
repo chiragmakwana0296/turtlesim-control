@@ -244,7 +244,9 @@ std::pair<double, double> PIDController::controlPose(double error, double dt)
   double target_y = target_pose_->y;
   double current_x = current_pose_->x;
   double current_y = current_pose_->y;
+  
   double angle_to_goal = std::atan2(target_y - current_y, target_x - current_x);
+  
   double linear_velocity{0.0};
   if(add_acce_deccl_limits_){
 
@@ -268,19 +270,21 @@ std::pair<double, double> PIDController::controlPose(double error, double dt)
 
   linear_velocity = std::min(linear_velocity, max_linear_velocity_);
 
-  double angular_velocity =(angle_to_goal - current_pose_->theta);
-  
-  if (angular_velocity > M_PI) {
-    angular_velocity -= angular_velocity;
+  double  angular_velocity{0.0};
+  double error_theta = (angle_to_goal - current_pose_->theta);
+    while (error_theta > M_PI) {
+    error_theta -= 2 * M_PI;
   }
-  if (angular_velocity < -M_PI) {
-    angular_velocity += angular_velocity;
+  while (error_theta < -M_PI) {
+    error_theta += 2 * M_PI;
   }
-  if (!(std::abs(angular_velocity) < M_PI)){
-    angular_velocity = max_angular_velocity_ * (angular_velocity > 0 ? max_angular_velocity_ : -max_angular_velocity_);
-  }
-  angular_velocity = std::max(std::min(angular_velocity, max_angular_velocity_), -max_angular_velocity_);
+  double error_derivative_theta = (error_theta - last_error_theta_);
+  last_error_theta_ = error_theta;
+  error_integral_theta_ += error_theta;
 
+  angular_velocity = (6.0*kp_ * (error_theta) + ki_ * error_integral_theta_ + kd_ * error_derivative_theta);
+
+  angular_velocity = std::max(std::min(angular_velocity, max_angular_velocity_), -max_angular_velocity_);
   return std::make_pair(linear_velocity, angular_velocity);
 }
 

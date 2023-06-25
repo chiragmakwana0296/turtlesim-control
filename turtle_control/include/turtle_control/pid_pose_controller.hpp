@@ -76,6 +76,9 @@ private:
   double error_integral_;
   double last_error_;
 
+  double error_integral_theta_;
+  double last_error_theta_;
+
   bool got_command_vel_{false};
   bool init_controller_{false};
   bool enable_rotate_circle_{false};
