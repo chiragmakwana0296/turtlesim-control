@@ -7,17 +7,17 @@
 ## Package setup 
 - create ROS 2 workspace
     ```bash
-    mkdir -p ~/flytbase_ws/src && cd ~/flytbase_ws/src
+    mkdir -p ~/ros2_ws/src && cd ~/ros2_ws/src
     ```
 - clone repo 
     ```bash
-    git clone git@github.com:chiragmakwana0296/flytbase-turtlesim.git
+    git clone git@github.com:chiragmakwana0296/turtlesim-control.git
     ```
 
 - build workspace
 
     ```bash
-    cd ~/flytbase_ws && colcon build
+    cd ~/ros2_ws && colcon build
     ```
 - source workspace (every time new terminal instance is launched or add to ~/.bashrc)
 
